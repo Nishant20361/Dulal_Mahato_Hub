@@ -1,0 +1,150 @@
+// Prisma schema for Dulal Mahato Hub
+// Local Database Provider: SQLite (Easily migratable to Supabase PostgreSQL later)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(uuid())
+  name             String
+  username         String             @unique
+  email            String             @unique
+  passwordHash     String
+  emailVerified    Boolean            @default(false)
+  emailVerifiedAt  DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  lastLoginAt      DateTime?
+
+  sessions         Session[]
+  folders          Folder[]
+  files            File[]
+  notes            Note[]
+  passwordResetOtps PasswordResetOtp[]
+  activityLogs     ActivityLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("sessions")
+}
+
+model Folder {
+  id        String    @id @default(uuid())
+  userId    String
+  parentId  String?
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isTrashed Boolean   @default(false)
+  trashedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?   @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]  @relation("FolderHierarchy")
+  files     File[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@index([userId, isTrashed])
+  @@map("folders")
+}
+
+model File {
+  id           String    @id @default(uuid())
+  userId       String
+  folderId     String?
+  name         String
+  originalName String
+  storageKey   String    @unique
+  mimeType     String
+  extension    String
+  size         BigInt
+  checksum     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastOpenedAt DateTime?
+  isTrashed    Boolean   @default(false)
+  trashedAt    DateTime?
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder       Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([userId, isTrashed])
+  @@map("files")
+}
+
+model Note {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  content   String
+  isPinned  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isTrashed Boolean   @default(false)
+  trashedAt DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isPinned])
+  @@index([userId, isTrashed])
+  @@map("notes")
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(uuid())
+  userId    String
+  otpHash   String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([otpHash])
+  @@map("password_reset_otps")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
